@@ -1,3 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歴史年号クイズアプリ (CSV読み込み版)</title>
+    <style>
+        /* スタイルは前回と同様 */
+        :root { --primary: #4a90e2; --secondary: #f39c12; --error: #e74c3c; --success: #2ecc71; --bg: #f4f7f6; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
+        .card { font-size: 1.5rem; padding: 40px; border: 2px solid var(--primary); border-radius: 10px; margin: 20px 0; cursor: pointer; min-height: 100px; display: flex; align-items: center; justify-content: center; }
+        .hidden { display: none; }
+        .miss-badge { background: var(--error); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; text-align: left; }
+        .option-item { border: 1px solid #ddd; padding: 10px; border-radius: 5px; cursor: pointer; }
+        .result { font-weight: bold; margin-top: 10px; }
+        #status-msg { color: #666; margin-bottom: 10px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="setup-screen">
+    <h2>歴史クイズ設定</h2>
+    <div id="status-msg">CSVファイルを読み込んでいます...</div>
+    
+    <div id="menu-area" class="hidden">
+        <h3>モード選択</h3>
+        <button onclick="startApp('flash-yr')">①(1) フラッシュ(年号→事)</button>
+        <button onclick="startApp('flash-ev')">①(2) フラッシュ(事→年号)</button>
+        <button onclick="startApp('flash-miss')">①(3) ミス問フラッシュ</button><br>
+        <button onclick="startApp('quiz-input')">② 年号入力クイズ</button>
+        <button onclick="startApp('quiz-select')">③ 出来事選択クイズ</button>
+    </div>
+    <div id="stats" style="margin-top: 20px; color: #666;"></div>
+</div>
+
+<div class="container hidden" id="app-screen">
+    <div id="quiz-header">
+        <span id="mode-title"></span> | 残り: <span id="remaining-count">0</span>
+    </div>
+    
+    <div id="flash-area" class="hidden">
+        <div class="card" id="flash-card" onclick="toggleFlash()">タップで回答を表示</div>
+        <button onclick="recordResult(true)">正解 (Next)</button>
+        <button onclick="recordResult(false)">不正解</button>
+    </div>
+
+    <div id="input-area" class="hidden">
+        <h3 id="input-question"></h3>
+        <input type="text" id="user-answer" placeholder="年号を入力" style="font-size: 1.2rem; padding: 5px; width: 80%;">
+        <div id="input-feedback" class="result"></div>
+        <button onclick="checkInputAnswer()">回答する</button>
+    </div>
+
+    <div id="select-area" class="hidden">
+        <h3 id="select-question"></h3>
+        <div class="options-grid" id="options-container"></div>
+        <div id="select-feedback" class="result"></div>
+        <button onclick="checkSelectAnswer()">回答する</button>
+    </div>
+
+    <hr>
+    <button onclick="exitApp()" style="background: #999;">終了して戻る</button>
+</div>
+
+<script>
 // --- 修正されたデータ管理ロジック ---
 
 const CSV_FILE_PATH = 'data.csv'; 
@@ -104,3 +173,6 @@ function recordResult(isCorrect) {
         exitApp();
     }
 }
+</script>
+</body>
+</html>
