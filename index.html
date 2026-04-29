@@ -3,18 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>歴史年号クイズアプリ</title>
+    <title>歴史年号クイズアプリ (CSV読み込み版)</title>
     <style>
-        :root {
-            --primary: #4a90e2;
-            --secondary: #f39c12;
-            --error: #e74c3c;
-            --success: #2ecc71;
-            --bg: #f4f7f6;
-        }
+        /* スタイルは前回と同様 */
+        :root { --primary: #4a90e2; --secondary: #f39c12; --error: #e74c3c; --success: #2ecc71; --bg: #f4f7f6; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
-        textarea { width: 100%; height: 100px; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; padding: 10px; }
         button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; transition: 0.3s; }
         button:hover { opacity: 0.8; }
         .card { font-size: 1.5rem; padding: 40px; border: 2px solid var(--primary); border-radius: 10px; margin: 20px 0; cursor: pointer; min-height: 100px; display: flex; align-items: center; justify-content: center; }
@@ -23,15 +17,16 @@
         .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0; text-align: left; }
         .option-item { border: 1px solid #ddd; padding: 10px; border-radius: 5px; cursor: pointer; }
         .result { font-weight: bold; margin-top: 10px; }
+        #status-msg { color: #666; margin-bottom: 10px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
 
 <div class="container" id="setup-screen">
     <h2>歴史クイズ設定</h2>
-    <p>CSV形式（年号,出来事）で入力してください</p>
-    <textarea id="csv-input" placeholder="710,平城京遷都&#10;794,平安京遷都&#10;1192,鎌倉幕府成立(諸説あり)"></textarea>
-    <div>
+    <div id="status-msg">CSVファイルを読み込んでいます...</div>
+    
+    <div id="menu-area" class="hidden">
         <h3>モード選択</h3>
         <button onclick="startApp('flash-yr')">①(1) フラッシュ(年号→事)</button>
         <button onclick="startApp('flash-ev')">①(2) フラッシュ(事→年号)</button>
@@ -62,7 +57,6 @@
 
     <div id="select-area" class="hidden">
         <h3 id="select-question"></h3>
-        <p>正しい出来事を選択してください（複数ある場合は全て）</p>
         <div class="options-grid" id="options-container"></div>
         <div id="select-feedback" class="result"></div>
         <button onclick="checkSelectAnswer()">回答する</button>
@@ -73,32 +67,44 @@
 </div>
 
 <script>
-    let masterData = []; // {yr, ev, missCount, streak}
+    // --- 設定：読み込むCSVファイル名 ---
+    const CSV_FILE_PATH = 'data.csv'; 
+
+    let masterData = []; 
     let currentQueue = [];
     let currentIndex = 0;
     let currentMode = '';
     let isFlipped = false;
 
-    // 初期化と起動
-    function startApp(mode) {
-        const input = document.getElementById('csv-input').value.trim();
-        if (!input && masterData.length === 0) return alert("CSVデータを入力してください");
-        
-        if (masterData.length === 0) {
-            masterData = input.split('\n').map(line => {
-                const [yr, ev] = line.split(',');
-                return { yr: yr.trim(), ev: ev.trim(), streak: 0 };
-            });
-        }
+    // ページ読み込み時にCSVを自動取得
+    window.addEventListener('DOMContentLoaded', async () => {
+        const statusMsg = document.getElementById('status-msg');
+        try {
+            const response = await fetch(CSV_FILE_PATH);
+            if (!response.ok) throw new Error('CSVファイルが見つかりません');
+            const text = await response.text();
+            
+            masterData = text.trim().split('\n').map(line => {
+                const parts = line.split(',');
+                if (parts.length < 2) return null;
+                return { yr: parts[0].trim(), ev: parts[1].trim(), streak: 0 };
+            }).filter(d => d !== null);
 
+            statusMsg.innerText = `CSV読み込み完了: ${masterData.length} 件`;
+            document.getElementById('menu-area').classList.remove('hidden');
+        } catch (err) {
+            statusMsg.innerText = `エラー: ${err.message}`;
+            statusMsg.style.color = 'red';
+        }
+    });
+
+    function startApp(mode) {
         currentMode = mode;
         setupQueue(mode);
-
         if (currentQueue.length === 0) {
-            alert("対象のデータがありません（ミス問リストが空など）");
+            alert("対象のデータがありません");
             return;
         }
-
         document.getElementById('setup-screen').classList.add('hidden');
         document.getElementById('app-screen').classList.remove('hidden');
         showQuestion();
@@ -125,14 +131,12 @@
             document.getElementById('flash-area').classList.remove('hidden');
             const card = document.getElementById('flash-card');
             card.innerText = (currentMode === 'flash-yr' || (currentMode === 'flash-miss' && Math.random() > 0.5)) ? item.yr : item.ev;
-        } 
-        else if (currentMode === 'quiz-input') {
+        } else if (currentMode === 'quiz-input') {
             document.getElementById('input-area').classList.remove('hidden');
             document.getElementById('input-question').innerText = item.ev;
             document.getElementById('user-answer').value = '';
             document.getElementById('input-feedback').innerText = '';
-        }
-        else if (currentMode === 'quiz-select') {
+        } else if (currentMode === 'quiz-select') {
             document.getElementById('select-area').classList.remove('hidden');
             document.getElementById('select-question').innerText = item.yr + "年";
             document.getElementById('select-feedback').innerText = '';
@@ -140,7 +144,6 @@
         }
     }
 
-    // ① フラッシュカード用
     function toggleFlash() {
         const item = currentQueue[currentIndex];
         const card = document.getElementById('flash-card');
@@ -150,33 +153,27 @@
         }
     }
 
-    // ② 入力式用
     function checkInputAnswer() {
         const item = currentQueue[currentIndex];
         const userAns = document.getElementById('user-answer').value.trim();
         const isCorrect = (userAns === item.yr);
         document.getElementById('input-feedback').innerText = isCorrect ? "正解！" : `不正解（正解: ${item.yr}）`;
         document.getElementById('input-feedback').style.color = isCorrect ? "var(--success)" : "var(--error)";
-        setTimeout(() => recordResult(isCorrect), 1200);
+        setTimeout(() => recordResult(isCorrect), 1000);
     }
 
-    // ③ 選択肢式用
     function setupSelectOptions(correctItem) {
         const container = document.getElementById('options-container');
         container.innerHTML = '';
-        // 正解の選択肢（同じ年号の出来事が複数あればそれも正解候補にする）
         let correctEvs = masterData.filter(d => d.yr === correctItem.yr).map(d => d.ev);
-        // ダミーを作る
-        let dummies = masterData.filter(d => d.yr !== correctItem.yr).map(d => d.ev);
-        dummies = dummies.sort(() => Math.random() - 0.5).slice(0, 5);
-        
-        let options = [...new Set([correctItem.ev, ...dummies])].sort(() => Math.random() - 0.5).slice(0, 6);
+        let allOtherEvs = masterData.filter(d => d.yr !== correctItem.yr).map(d => d.ev);
+        let dummies = allOtherEvs.sort(() => Math.random() - 0.5).slice(0, 5);
+        let options = [...new Set([correctItem.ev, ...dummies])].sort(() => Math.random() - 0.5);
         
         options.forEach(opt => {
             const div = document.createElement('div');
             div.className = 'option-item';
-            div.innerHTML = `<input type="checkbox" value="${opt}"> ${opt}`;
-            div.onclick = (e) => { if(e.target.tagName !== 'INPUT') div.querySelector('input').click(); };
+            div.innerHTML = `<label style="cursor:pointer; display:block;"><input type="checkbox" value="${opt}"> ${opt}</label>`;
             container.appendChild(div);
         });
     }
@@ -185,33 +182,30 @@
         const item = currentQueue[currentIndex];
         const selected = Array.from(document.querySelectorAll('#options-container input:checked')).map(i => i.value);
         const correctEvs = masterData.filter(d => d.yr === item.yr).map(d => d.ev);
-        
-        const isCorrect = selected.length > 0 && selected.every(s => correctEvs.includes(s)) && correctEvs.filter(c => document.querySelector(`#options-container input[value="${c}"]`)).every(c => selected.includes(c));
+        const isCorrect = selected.length > 0 && 
+                          selected.every(s => correctEvs.includes(s)) && 
+                          correctEvs.filter(c => Array.from(document.querySelectorAll('#options-container input')).map(el=>el.value).includes(c)).every(c => selected.includes(c));
 
         document.getElementById('select-feedback').innerText = isCorrect ? "正解！" : `不正解`;
         document.getElementById('select-feedback').style.color = isCorrect ? "var(--success)" : "var(--error)";
-        setTimeout(() => recordResult(isCorrect), 1200);
+        setTimeout(() => recordResult(isCorrect), 1000);
     }
 
-    // 共通：結果記録と次へ
     function recordResult(isCorrect) {
         const item = currentQueue[currentIndex];
         const masterItem = masterData.find(d => d.yr === item.yr && d.ev === item.ev);
-
         if (isCorrect) {
             masterItem.streak = Math.max(0, masterItem.streak) + 1;
-            if (masterItem.streak >= 3) masterItem.streak = 0; // 3回連続でミスリストから削除(0に戻す)
+            if (masterItem.streak >= 3) masterItem.streak = 0; 
         } else {
-            masterItem.streak = -1; // ミスリスト入り
+            masterItem.streak = -1;
         }
-
         currentIndex++;
-        document.getElementById('remaining-count').innerText = currentQueue.length - currentIndex;
-
         if (currentIndex < currentQueue.length) {
+            document.getElementById('remaining-count').innerText = currentQueue.length - currentIndex;
             showQuestion();
         } else {
-            alert("全問終了しました！");
+            alert("終了しました！");
             exitApp();
         }
     }
@@ -220,9 +214,8 @@
         document.getElementById('setup-screen').classList.remove('hidden');
         document.getElementById('app-screen').classList.add('hidden');
         const missCount = masterData.filter(d => d.streak < 0).length;
-        document.getElementById('stats').innerHTML = `現在のミス問登録数: <span class="miss-badge">${missCount}</span>`;
+        document.getElementById('stats').innerHTML = `ミス問登録数: <span class="miss-badge">${missCount}</span>`;
     }
 </script>
-
 </body>
 </html>
